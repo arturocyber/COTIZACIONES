@@ -314,12 +314,12 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
 <!-- ACTION BAR -->
 <div class="action-bar">
   <button class="btn btn-preview" onclick="showPreview()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
-    Vista PDF
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    Vista Previa
   </button>
-  <button class="btn btn-share" onclick="sharePdfFile()">
+  <button class="btn btn-share" onclick="shareAsImage()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16,6 12,2 8,6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-    Compartir PDF
+    Compartir
   </button>
 </div>
 
@@ -330,9 +330,9 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
   <div class="overlay-actions">
     <button class="btn btn-preview" onclick="downloadPDF()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Descargar
+      Descargar PDF
     </button>
-    <button class="btn btn-share" onclick="sharePdfFile()">
+    <button class="btn btn-share" onclick="shareAsImage()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16,6 12,2 8,6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
       Compartir
     </button>
@@ -599,45 +599,50 @@ async function generatePdfBlob() {
   return pdf.output('blob');
 }
 
-// ── SHARE PDF ──
-async function sharePdfFile() {
+// ── SHARE AS IMAGE ──
+async function shareAsImage() {
   const cur = getCur();
   const qNum = document.getElementById('f_quoteNum').value || 'cotizacion';
   const projName = document.getElementById('f_projName').value || 'Cliente';
   const compName = document.getElementById('f_companyName').value || 'INVERSSYS SRL';
-  const compPhone = document.getElementById('f_companyPhone').value;
-  const fname = `${compName.replace(/\s+/g,'_')}_${qNum}${projName ? '_'+projName.replace(/\s+/g,'_') : ''}.pdf`;
+  const fname = `${compName.replace(/\s+/g,'_')}_${qNum}.png`;
   let sub = 0;
   lineItems.forEach(i => { sub += (parseFloat(i.qty)||0) * (parseFloat(i.price)||0); });
   const total = sub * 1.18;
 
-  toast('Generando PDF...');
+  toast('Generando...');
+
+  // Render the quote
+  document.getElementById('pdfRender').innerHTML = buildPdfHtml();
+  await new Promise(r => setTimeout(r, 300));
 
   try {
-    const pdfBlob = await generatePdfBlob();
-    const pdfFile = new File([pdfBlob], fname, { type: 'application/pdf' });
+    const el = document.getElementById('pdfRender');
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const file = new File([blob], fname, { type: 'image/png' });
 
-    // Native share (mobile) — opens share sheet where user picks WhatsApp, Email, etc.
-    if(navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+    // Mobile: native share sheet — works with WhatsApp, Email, Telegram, etc.
+    if(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
-        title: `Cotización ${qNum} — ${compName}`,
-        text: `${compName} — Cotización No. ${qNum}\n${projName}\nTotal: ${cur.sym}${total.toFixed(2)} ${cur.code} (ITBIS incl.)`,
-        files: [pdfFile]
+        title: `Cotización ${qNum}`,
+        text: `${compName} — Cotización No. ${qNum}\n${projName}\nTotal: ${cur.sym}${total.toFixed(2)} ${cur.code}`,
+        files: [file]
       });
       toast('Compartido ✓');
       return;
     }
 
-    // Desktop fallback — direct download
-    const url = URL.createObjectURL(pdfBlob);
+    // Desktop: download image
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = fname; a.click();
     URL.revokeObjectURL(url);
-    toast('PDF descargado ✓');
+    toast('Imagen descargada ✓');
 
   } catch(e) {
     if(e.name === 'AbortError') { toast('Cancelado'); return; }
     console.error(e);
-    toast('Error — use Vista PDF');
+    toast('Error — use Vista Previa');
   }
 }
 

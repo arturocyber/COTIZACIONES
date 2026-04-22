@@ -408,7 +408,7 @@ function esc(s) { return (s||'').replace(/"/g,'&quot;'); }
 
 function getCur() {
   const c = document.getElementById('f_currency').value;
-  return c === 'DOP' ? {code:'DOP',sym:'RD$'} : {code:'USD',sym:'$'};
+  return c === 'DOP' ? {code:'$RD',sym:'RD$'} : {code:'USD',sym:'$'};
 }
 
 function fmtMoney(n) {
@@ -589,13 +589,23 @@ async function downloadPDF() {
   }
 }
 
+// ── GENERATE PDF BLOB ──
+async function generatePdfBlob() {
+  document.getElementById('pdfRender').innerHTML = buildPdfHtml();
+  // Brief delay to let images render
+  await new Promise(r => setTimeout(r, 200));
+  const el = document.getElementById('pdfRender');
+  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','mm','letter');
+  const imgW = 216 - 20;
+  const imgH = (canvas.height * imgW) / canvas.width;
+  pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 10, 10, imgW, imgH);
+  return pdf.output('blob');
+}
+
 // ── SHARE ──
 async function sharePDF(method) {
-  // First show preview so pdfRender is populated
-  document.getElementById('pdfRender').innerHTML = buildPdfHtml();
-  document.getElementById('previewOverlay').classList.add('show');
-  document.body.style.overflow = 'hidden';
-
   const cur = getCur();
   const qNum = document.getElementById('f_quoteNum').value || 'cotizacion';
   const projName = document.getElementById('f_projName').value || 'Cliente';
@@ -605,17 +615,62 @@ async function sharePDF(method) {
   let sub = 0;
   lineItems.forEach(i => { sub += (parseFloat(i.qty)||0) * (parseFloat(i.price)||0); });
   const total = sub * 1.18;
+  const fname = `${compName.replace(/\s+/g,'_')}_${qNum}${projName ? '_'+projName.replace(/\s+/g,'_') : ''}.pdf`;
+
+  toast('Generando PDF...');
+
+  try {
+    const pdfBlob = await generatePdfBlob();
+    const pdfFile = new File([pdfBlob], fname, { type: 'application/pdf' });
+
+    // Try native share with PDF file (works on mobile — opens share sheet with WhatsApp, Email, etc.)
+    if(navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      let shareText = '';
+      if(method === 'wa') {
+        shareText = `*${compName} — Cotización*\n📋 No. ${qNum}\n🏢 ${projName}\n💰 Total: ${cur.sym}${total.toFixed(2)} ${cur.code} (ITBIS incl.)\n\n_Quedamos a su disposición._`;
+      } else {
+        shareText = `Cotización No. ${qNum} — ${projName}\nTotal: ${cur.sym}${total.toFixed(2)} ${cur.code} (ITBIS incluido)\n\n${compName}\n${compPhone} · ${compEmail}`;
+      }
+      await navigator.share({
+        title: `Cotización ${qNum} — ${compName}`,
+        text: shareText,
+        files: [pdfFile]
+      });
+      toast('Compartido ✓');
+      return;
+    }
+  } catch(e) {
+    // Native share cancelled or not supported — fall through to fallback
+    if(e.name === 'AbortError') { toast('Cancelado'); return; }
+    console.log('Native share not available, using fallback', e);
+  }
+
+  // ── FALLBACK: no native share available ──
+  // Show preview overlay
+  document.getElementById('previewOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
 
   if(method === 'wa') {
-    const msg = encodeURIComponent(
-      `*${compName} — Cotización*\n` +
-      `📋 No. ${qNum}\n` +
-      `🏢 ${projName}\n` +
-      `💰 Total: ${cur.sym}${total.toFixed(2)} ${cur.code} (ITBIS incl.)\n\n` +
-      `_Le adjuntamos la cotización. Quedamos a su disposición._`
-    );
-    window.open('https://wa.me/?text=' + msg, '_blank');
-    toast('Abriendo WhatsApp...');
+    // Download the PDF first, then open WhatsApp with text
+    try {
+      const pdfBlob = await generatePdfBlob();
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a'); a.href = url; a.download = fname; a.click();
+      URL.revokeObjectURL(url);
+      toast('PDF descargado — adjúntalo en WhatsApp');
+    } catch(e) { toast('Error generando PDF'); }
+
+    setTimeout(() => {
+      const msg = encodeURIComponent(
+        `*${compName} — Cotización*\n` +
+        `📋 No. ${qNum}\n` +
+        `🏢 ${projName}\n` +
+        `💰 Total: ${cur.sym}${total.toFixed(2)} ${cur.code} (ITBIS incl.)\n\n` +
+        `_Le adjuntamos la cotización. Quedamos a su disposición._`
+      );
+      window.open('https://wa.me/?text=' + msg, '_blank');
+    }, 1000);
+
   } else if(method === 'email') {
     const subject = encodeURIComponent(`Cotización ${qNum} — ${compName}`);
     const body = encodeURIComponent(
@@ -627,19 +682,6 @@ async function sharePDF(method) {
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
     toast('Abriendo correo...');
-  }
-
-  // Also try native share if available
-  if(navigator.share && navigator.canShare) {
-    try {
-      const el = document.getElementById('pdfRender');
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-      const file = new File([blob], `INVERSSYS_${qNum}.png`, {type:'image/png'});
-      if(navigator.canShare({files:[file]})) {
-        await navigator.share({ title: `Cotización ${qNum}`, files: [file] });
-      }
-    } catch(e) { /* user cancelled or not supported */ }
   }
 }
 

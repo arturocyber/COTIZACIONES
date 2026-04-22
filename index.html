@@ -9,6 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -406,8 +408,7 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
 <div id="tab-historial" class="form-section">
   <div class="section-label">Cotizaciones y Facturas Guardadas</div>
   <div class="hist-filter">
-    <button class="active" onclick="filterHist('all',this)">Todas</button>
-    <button onclick="filterHist('cotizacion',this)">Cotizaciones</button>
+    <button class="active" onclick="filterHist('cotizacion',this)">Cotizaciones</button>
     <button onclick="filterHist('factura',this)">Facturas</button>
   </div>
   <div id="histList"></div>
@@ -463,6 +464,19 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
 </div>
 
 <script>
+// ── FIREBASE CONFIG ──
+// TODO: Replace with your Firebase project config
+firebase.initializeApp({
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+});
+const db = firebase.firestore();
+const quotesCol = db.collection('cotizaciones');
+
 // ── INIT ──
 const today = new Date();
 document.getElementById('f_date').value = today.toISOString().split('T')[0];
@@ -759,8 +773,9 @@ function closePwModal() {
 function submitPw() {
   const pw = document.getElementById('pwInput').value;
   if(pw === ADMIN_PW) {
+    const action = pendingPwAction;
     closePwModal();
-    if(pendingPwAction) pendingPwAction();
+    if(action) action();
   } else {
     toast('Contraseña incorrecta');
     document.getElementById('pwInput').value = '';
@@ -779,17 +794,33 @@ function showConfirm(title, msg, onOk) {
 }
 function closeConfirm() { document.getElementById('confirmModal').classList.remove('show'); }
 
-// ── STORAGE HELPERS ──
-function loadQuotes() {
+// ── STORAGE HELPERS (Firestore) ──
+async function loadQuotes() {
   try {
-    const raw = localStorage.getItem('inverssys-quotes');
-    return raw ? JSON.parse(raw) : [];
-  } catch(e) { return []; }
+    const snap = await quotesCol.orderBy('createdAt', 'desc').get();
+    return snap.docs.map(doc => doc.data());
+  } catch(e) { console.error('Firestore load error:', e); return []; }
 }
-function saveQuotes(quotes) {
+async function saveQuote(entry) {
   try {
-    localStorage.setItem('inverssys-quotes', JSON.stringify(quotes));
-  } catch(e) { toast('Error guardando datos'); console.error(e); }
+    await quotesCol.doc(entry.id).set(entry);
+  } catch(e) { toast('Error guardando en Firebase'); console.error(e); }
+}
+async function updateQuoteField(id, fields) {
+  try {
+    await quotesCol.doc(id).update(fields);
+  } catch(e) { console.error('Firestore update error:', e); }
+}
+async function deleteQuoteFromDb(id) {
+  try {
+    await quotesCol.doc(id).delete();
+  } catch(e) { toast('Error eliminando'); console.error(e); }
+}
+async function getQuote(id) {
+  try {
+    const doc = await quotesCol.doc(id).get();
+    return doc.exists ? doc.data() : null;
+  } catch(e) { console.error(e); return null; }
 }
 
 // ── COLLECT FORM DATA ──
@@ -873,8 +904,7 @@ function completeQuote() {
   showConfirm(
     'Completar ' + docLabel,
     '¿Guardar "' + data.quoteNum + ' — ' + data.projName + '" como completada? Una vez guardada será de solo lectura.',
-    () => {
-      const quotes = loadQuotes();
+    async () => {
       const sub = lineItems.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.price)||0), 0);
       const entry = {
         id: Date.now().toString(36) + Math.random().toString(36).substr(2,4),
@@ -888,10 +918,9 @@ function completeQuote() {
         convertedFrom: null,
         data: data
       };
-      quotes.unshift(entry);
-      saveQuotes(quotes);
+      await saveQuote(entry);
       toast(docLabel + ' guardada ✓');
-      renderHistorial();
+      await renderHistorial();
       // Switch to historial tab
       document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
@@ -925,7 +954,7 @@ function resetForm() {
 }
 
 // ── HISTORIAL RENDERING ──
-let histFilter = 'all';
+let histFilter = 'cotizacion';
 
 function filterHist(type, btn) {
   histFilter = type;
@@ -934,9 +963,9 @@ function filterHist(type, btn) {
   renderHistorial();
 }
 
-function renderHistorial() {
-  const quotes = loadQuotes();
-  const filtered = histFilter === 'all' ? quotes : quotes.filter(q => q.type === histFilter);
+async function renderHistorial() {
+  const quotes = await loadQuotes();
+  const filtered = quotes.filter(q => q.type === histFilter);
   const container = document.getElementById('histList');
 
   if(filtered.length === 0) {
@@ -964,7 +993,7 @@ function renderHistorial() {
         </div>
         <div class="hist-actions">
           <button class="hist-btn-view" onclick="viewQuote('${q.id}')">Ver</button>
-          ${q.type==='cotizacion' && q.status!=='converted' ? '<button class="hist-btn-convert" onclick="convertToFactura(\''+q.id+'\')">→ Factura</button>' : ''}
+          ${q.type==='cotizacion' && q.status!=='converted' ? '<button class="hist-btn-convert" onclick="convertToFactura(\''+q.id+'\')">Convertir en Factura</button>' : ''}
           <button class="hist-btn-delete" onclick="deleteQuote('${q.id}')">Eliminar</button>
         </div>
       </div>
@@ -974,9 +1003,8 @@ function renderHistorial() {
 
 // ── VIEW QUOTE (password protected, read-only) ──
 function viewQuote(id) {
-  openPwModal(() => {
-    const quotes = loadQuotes();
-    const q = quotes.find(x => x.id === id);
+  openPwModal(async () => {
+    const q = await getQuote(id);
     if(!q) { toast('Documento no encontrado'); return; }
     loadFormData(q.data);
     enterReadonly();
@@ -1001,15 +1029,14 @@ function exitReadonly() {
 
 // ── CONVERT TO FACTURA ──
 function convertToFactura(id) {
-  openPwModal(() => {
-    const quotes = loadQuotes();
-    const q = quotes.find(x => x.id === id);
+  openPwModal(async () => {
+    const q = await getQuote(id);
     if(!q) { toast('Documento no encontrado'); return; }
 
     showConfirm(
-      'Convertir a Factura',
+      'Convertir en Factura',
       'Se creará una nueva Factura a partir de la cotización "' + q.quoteNum + '". La cotización original se marcará como convertida.',
-      () => {
+      async () => {
         // Load data into form as factura
         const newData = {...q.data};
         newData.docType = 'factura';
@@ -1022,9 +1049,8 @@ function convertToFactura(id) {
 
         loadFormData(newData);
 
-        // Mark original as converted
-        const idx = quotes.findIndex(x => x.id === id);
-        if(idx >= 0) { quotes[idx].status = 'converted'; saveQuotes(quotes); }
+        // Mark original as converted in Firestore
+        await updateQuoteField(id, { status: 'converted' });
 
         exitReadonly();
 
@@ -1037,7 +1063,7 @@ function convertToFactura(id) {
         toast('Factura creada — complete el NCF para DGII');
         // Scroll to NCF field
         setTimeout(() => document.getElementById('f_ncf').focus(), 300);
-        renderHistorial();
+        await renderHistorial();
       }
     );
   });
@@ -1045,13 +1071,11 @@ function convertToFactura(id) {
 
 // ── DELETE QUOTE ──
 function deleteQuote(id) {
-  openPwModal(() => {
-    showConfirm('Eliminar documento', '¿Está seguro? Esta acción no se puede deshacer.', () => {
-      let quotes = loadQuotes();
-      quotes = quotes.filter(q => q.id !== id);
-      saveQuotes(quotes);
+  openPwModal(async () => {
+    showConfirm('Eliminar documento', '¿Está seguro? Esta acción no se puede deshacer.', async () => {
+      await deleteQuoteFromDb(id);
       toast('Documento eliminado');
-      renderHistorial();
+      await renderHistorial();
     });
   });
 }

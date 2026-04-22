@@ -318,11 +318,11 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
     Vista PDF
   </button>
-  <button class="btn btn-wa" onclick="sharePDF('wa')">
+  <button class="btn btn-wa" onclick="shareWhatsApp()">
     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
     WhatsApp
   </button>
-  <button class="btn btn-email" onclick="sharePDF('email')">
+  <button class="btn btn-email" onclick="shareEmail()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
     Email
   </button>
@@ -337,7 +337,7 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Descargar PDF
     </button>
-    <button class="btn btn-wa" onclick="sharePDF('wa')">
+    <button class="btn btn-wa" onclick="shareWhatsApp()">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
       WhatsApp
     </button>
@@ -604,8 +604,8 @@ async function generatePdfBlob() {
   return pdf.output('blob');
 }
 
-// ── SHARE ──
-async function sharePDF(method) {
+// ── SHARE HELPERS ──
+function getShareInfo() {
   const cur = getCur();
   const qNum = document.getElementById('f_quoteNum').value || 'cotizacion';
   const projName = document.getElementById('f_projName').value || 'Cliente';
@@ -616,73 +616,108 @@ async function sharePDF(method) {
   lineItems.forEach(i => { sub += (parseFloat(i.qty)||0) * (parseFloat(i.price)||0); });
   const total = sub * 1.18;
   const fname = `${compName.replace(/\s+/g,'_')}_${qNum}${projName ? '_'+projName.replace(/\s+/g,'_') : ''}.pdf`;
+  return { cur, qNum, projName, compName, compPhone, compEmail, total, fname };
+}
 
+// ── WHATSAPP ──
+async function shareWhatsApp() {
+  const info = getShareInfo();
   toast('Generando PDF...');
 
   try {
     const pdfBlob = await generatePdfBlob();
-    const pdfFile = new File([pdfBlob], fname, { type: 'application/pdf' });
+    const pdfFile = new File([pdfBlob], info.fname, { type: 'application/pdf' });
 
-    // Try native share with PDF file (works on mobile — opens share sheet with WhatsApp, Email, etc.)
+    // Try native share (mobile browsers — opens share sheet with PDF attached)
     if(navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-      let shareText = '';
-      if(method === 'wa') {
-        shareText = `*${compName} — Cotización*\n📋 No. ${qNum}\n🏢 ${projName}\n💰 Total: ${cur.sym}${total.toFixed(2)} ${cur.code} (ITBIS incl.)\n\n_Quedamos a su disposición._`;
-      } else {
-        shareText = `Cotización No. ${qNum} — ${projName}\nTotal: ${cur.sym}${total.toFixed(2)} ${cur.code} (ITBIS incluido)\n\n${compName}\n${compPhone} · ${compEmail}`;
-      }
       await navigator.share({
-        title: `Cotización ${qNum} — ${compName}`,
-        text: shareText,
+        title: `Cotización ${info.qNum}`,
+        text: `*${info.compName} — Cotización*\n📋 No. ${info.qNum}\n🏢 ${info.projName}\n💰 Total: ${info.cur.sym}${info.total.toFixed(2)} ${info.cur.code} (ITBIS incl.)`,
         files: [pdfFile]
       });
       toast('Compartido ✓');
       return;
     }
-  } catch(e) {
-    // Native share cancelled or not supported — fall through to fallback
-    if(e.name === 'AbortError') { toast('Cancelado'); return; }
-    console.log('Native share not available, using fallback', e);
-  }
 
-  // ── FALLBACK: no native share available ──
-  // Show preview overlay
+    // Fallback: download PDF then show guide
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a'); a.href = url; a.download = info.fname; a.click();
+    URL.revokeObjectURL(url);
+    showWaGuide(info);
+
+  } catch(e) {
+    if(e.name === 'AbortError') { toast('Cancelado'); return; }
+    console.error(e);
+    toast('Error — use Vista PDF para descargar');
+  }
+}
+
+function showWaGuide(info) {
+  const msg = encodeURIComponent(
+    `*${info.compName} — Cotización*\n📋 No. ${info.qNum}\n🏢 ${info.projName}\n💰 Total: ${info.cur.sym}${info.total.toFixed(2)} ${info.cur.code} (ITBIS incl.)\n\n_Le adjuntamos la cotización. Quedamos a su disposición._`
+  );
+  document.getElementById('pdfRender').innerHTML = `
+    <div style="padding:40px 24px;text-align:center;font-family:'DM Sans',sans-serif">
+      <div style="font-size:48px;margin-bottom:12px">✅</div>
+      <h2 style="font-size:20px;color:#1a1a2e;margin-bottom:6px">PDF Guardado</h2>
+      <p style="font-size:13px;color:#5a6270;margin-bottom:28px;word-break:break-all">${info.fname}</p>
+      <div style="text-align:left;max-width:340px;margin:0 auto">
+        <div style="display:flex;gap:12px;margin-bottom:18px">
+          <div style="min-width:32px;height:32px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0">1</div>
+          <div><p style="font-size:14px;font-weight:600;color:#1a1a2e">Toque "Abrir WhatsApp" abajo</p><p style="font-size:12px;color:#5a6270;margin-top:2px">El mensaje con el resumen ya está listo.</p></div>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:18px">
+          <div style="min-width:32px;height:32px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0">2</div>
+          <div><p style="font-size:14px;font-weight:600;color:#1a1a2e">Escoja el contacto</p><p style="font-size:12px;color:#5a6270;margin-top:2px">Seleccione el cliente o grupo.</p></div>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:28px">
+          <div style="min-width:32px;height:32px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0">3</div>
+          <div><p style="font-size:14px;font-weight:600;color:#1a1a2e">Adjunte el PDF 📎</p><p style="font-size:12px;color:#5a6270;margin-top:2px">Toque 📎 → <strong>Documento</strong> → seleccione el PDF.</p></div>
+        </div>
+      </div>
+      <a href="https://wa.me/?text=${msg}" target="_blank" rel="noopener"
+         style="display:inline-flex;align-items:center;gap:8px;padding:15px 30px;background:#25D366;color:#fff;border-radius:12px;text-decoration:none;font-size:15px;font-weight:700">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:20px;height:20px"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Abrir WhatsApp
+      </a>
+    </div>`;
   document.getElementById('previewOverlay').classList.add('show');
   document.body.style.overflow = 'hidden';
+}
 
-  if(method === 'wa') {
-    // Download the PDF first, then open WhatsApp with text
-    try {
-      const pdfBlob = await generatePdfBlob();
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a'); a.href = url; a.download = fname; a.click();
-      URL.revokeObjectURL(url);
-      toast('PDF descargado — adjúntalo en WhatsApp');
-    } catch(e) { toast('Error generando PDF'); }
+// ── EMAIL ──
+async function shareEmail() {
+  const info = getShareInfo();
+  toast('Generando PDF...');
 
-    setTimeout(() => {
-      const msg = encodeURIComponent(
-        `*${compName} — Cotización*\n` +
-        `📋 No. ${qNum}\n` +
-        `🏢 ${projName}\n` +
-        `💰 Total: ${cur.sym}${total.toFixed(2)} ${cur.code} (ITBIS incl.)\n\n` +
-        `_Le adjuntamos la cotización. Quedamos a su disposición._`
-      );
-      window.open('https://wa.me/?text=' + msg, '_blank');
-    }, 1000);
+  try {
+    const pdfBlob = await generatePdfBlob();
+    const pdfFile = new File([pdfBlob], info.fname, { type: 'application/pdf' });
 
-  } else if(method === 'email') {
-    const subject = encodeURIComponent(`Cotización ${qNum} — ${compName}`);
-    const body = encodeURIComponent(
-      `Estimado/a,\n\n` +
-      `Le hacemos llegar la cotización No. ${qNum} para el proyecto "${projName}".\n\n` +
-      `Total: ${cur.sym}${total.toFixed(2)} ${cur.code} (ITBIS incluido)\n\n` +
-      `Quedamos a su disposición para cualquier consulta.\n\n` +
-      `Saludos,\n${compName}\n${compPhone} · ${compEmail}`
-    );
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-    toast('Abriendo correo...');
+    if(navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      await navigator.share({
+        title: `Cotización ${info.qNum} — ${info.compName}`,
+        text: `Cotización No. ${info.qNum} — ${info.projName}\nTotal: ${info.cur.sym}${info.total.toFixed(2)} ${info.cur.code}\n\n${info.compName} · ${info.compPhone}`,
+        files: [pdfFile]
+      });
+      toast('Compartido ✓');
+      return;
+    }
+
+    // Fallback: download + mailto
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a'); a.href = url; a.download = info.fname; a.click();
+    URL.revokeObjectURL(url);
+    toast('PDF descargado — adjúntalo al correo');
+  } catch(e) {
+    if(e.name === 'AbortError') { toast('Cancelado'); return; }
   }
+
+  const subject = encodeURIComponent(`Cotización ${info.qNum} — ${info.compName}`);
+  const body = encodeURIComponent(
+    `Estimado/a,\n\nLe hacemos llegar la cotización No. ${info.qNum} para el proyecto "${info.projName}".\n\nTotal: ${info.cur.sym}${info.total.toFixed(2)} ${info.cur.code} (ITBIS incluido)\n\nQuedamos a su disposición.\n\nSaludos,\n${info.compName}\n${info.compPhone} · ${info.compEmail}`
+  );
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
 }
 
 // ── TOAST ──

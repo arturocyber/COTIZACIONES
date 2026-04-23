@@ -9,8 +9,6 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -61,7 +59,6 @@ body{min-height:100dvh;padding-bottom:90px}
 }
 .hist-badge.cot{background:var(--blue-light);color:var(--dark-blue)}
 .hist-badge.fac{background:#d4edda;color:#155724}
-.hist-badge.conv{background:#fff3cd;color:#856404}
 .hist-item-meta{font-size:12px;color:var(--text-dim);margin-bottom:10px}
 .hist-item-total{font-weight:700;color:var(--navy)}
 .hist-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -450,21 +447,6 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════
-// FIREBASE CONFIG — Firebase Console → Project Settings
-// ═══════════════════════════════════════════════════════
-const firebaseConfig = {
-  apiKey:            "",  // ← Tu API Key
-  authDomain:        "",  // ← ejemplo: inverssys-app.firebaseapp.com
-  projectId:         "",  // ← ejemplo: inverssys-app
-  storageBucket:     "",  // ← ejemplo: inverssys-app.appspot.com
-  messagingSenderId: "",  // ← Tu Sender ID
-  appId:             ""   // ← Tu App ID
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const quotesCol = db.collection('cotizaciones');
-
 // ── INIT ──
 const today = new Date();
 document.getElementById('f_date').value = today.toISOString().split('T')[0];
@@ -828,33 +810,14 @@ function showConfirm(title, msg, onOk) {
 }
 function closeConfirm() { document.getElementById('confirmModal').classList.remove('show'); }
 
-// ── STORAGE HELPERS (Firestore) ──
-async function loadQuotes() {
-  try {
-    const snap = await quotesCol.orderBy('createdAt', 'desc').get();
-    return snap.docs.map(doc => doc.data());
-  } catch(e) { console.error('Firestore load error:', e); return []; }
+// ── STORAGE (localStorage) ──
+const STORE_KEY = 'inverssys_docs';
+function loadDocs() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch(e) { return []; }
 }
-async function saveQuote(entry) {
-  try {
-    await quotesCol.doc(entry.id).set(entry);
-  } catch(e) { toast('Error guardando en Firebase'); console.error(e); }
-}
-async function updateQuoteField(id, fields) {
-  try {
-    await quotesCol.doc(id).update(fields);
-  } catch(e) { console.error('Firestore update error:', e); }
-}
-async function deleteQuoteFromDb(id) {
-  try {
-    await quotesCol.doc(id).delete();
-  } catch(e) { toast('Error eliminando'); console.error(e); }
-}
-async function getQuote(id) {
-  try {
-    const doc = await quotesCol.doc(id).get();
-    return doc.exists ? doc.data() : null;
-  } catch(e) { console.error(e); return null; }
+function saveDocs(docs) {
+  localStorage.setItem(STORE_KEY, JSON.stringify(docs));
 }
 
 // ── COLLECT FORM DATA ──
@@ -900,7 +863,6 @@ function loadFormData(data) {
   document.getElementById('f_companyPhone').value = data.companyPhone || '';
   document.getElementById('f_companyEmail').value = data.companyEmail || '';
   document.getElementById('f_companyAddress').value = data.companyAddress || '';
-  // prepared by
   const selPrep = document.getElementById('f_preparedBy');
   const opts = Array.from(selPrep.options).map(o=>o.value);
   if(opts.includes(data.preparedBy)) { selPrep.value = data.preparedBy; }
@@ -913,15 +875,23 @@ function loadFormData(data) {
   document.getElementById('f_projArea').value = data.projArea || '';
   document.getElementById('f_payTerms').value = data.payTerms || '';
   document.getElementById('f_observations').value = data.observations || '';
-  // line items
-  lineItems = [];
-  itemIdCounter = 0;
+  lineItems = []; itemIdCounter = 0;
   (data.lineItems || []).forEach(li => addLineItem(li.code, li.desc, li.qty, li.price));
   if(lineItems.length === 0) { addLineItem(); addLineItem(); addLineItem(); }
   calcTotals();
 }
 
-// ── COMPLETE / SAVE QUOTE ──
+// ── SWITCH TO TAB ──
+function goToTab(tabName) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+  document.querySelector('[data-tab="'+tabName+'"]').classList.add('active');
+  document.getElementById('tab-'+tabName).classList.add('active');
+}
+
+// ── COMPLETAR ──
+let editingId = null;
+
 function completeQuote() {
   const data = collectFormData();
   if(!data.quoteNum) { toast('Falta el número de documento'); return; }
@@ -929,50 +899,51 @@ function completeQuote() {
 
   const docLabel = data.docType === 'factura' ? 'Factura' : 'Cotización';
 
-  // DGII validation for facturas
   if(data.docType === 'factura') {
     if(!data.clientRnc) { toast('DGII requiere RNC/Cédula del cliente'); return; }
     if(!data.ncf) { toast('DGII requiere NCF para facturas'); return; }
   }
 
-  const isEdit = !!editingQuoteId;
-  const confirmMsg = isEdit
-    ? '¿Actualizar "' + data.quoteNum + ' — ' + data.projName + '" y generar PDF?'
-    : '¿Guardar "' + data.quoteNum + ' — ' + data.projName + '" y generar PDF?';
-
+  const action = editingId ? 'Actualizar' : 'Completar';
   showConfirm(
-    (isEdit ? 'Actualizar ' : 'Completar ') + docLabel,
-    confirmMsg,
+    action + ' ' + docLabel,
+    '¿' + action + ' "' + data.quoteNum + ' — ' + data.projName + '"?',
     async () => {
+      const docs = loadDocs();
       const sub = lineItems.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.price)||0), 0);
       const entry = {
-        id: editingQuoteId || (Date.now().toString(36) + Math.random().toString(36).substr(2,4)),
+        id: editingId || (Date.now().toString(36) + Math.random().toString(36).substr(2,4)),
         type: data.docType,
-        status: 'completed',
         quoteNum: data.quoteNum,
         clientName: data.projName,
         total: sub * 1.18,
         currency: data.currency === 'DOP' ? 'RD$' : '$',
         createdAt: data.date || new Date().toISOString().split('T')[0],
-        convertedFrom: null,
         data: data
       };
-      await saveQuote(entry);
-      toast(docLabel + (isEdit ? ' actualizada' : ' guardada') + ' — generando PDF...');
+
+      if(editingId) {
+        const idx = docs.findIndex(d => d.id === editingId);
+        if(idx >= 0) docs[idx] = entry; else docs.unshift(entry);
+      } else {
+        docs.unshift(entry);
+      }
+      saveDocs(docs);
+
+      toast('Generando PDF...');
       await downloadPDF();
-      await renderHistorial();
-      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
-      document.querySelector('[data-tab="historial"]').classList.add('active');
-      document.getElementById('tab-historial').classList.add('active');
+      toast(docLabel + (editingId ? ' actualizada ✓' : ' guardada ✓'));
+
       resetForm();
+      renderHistorial();
+      goToTab('historial');
     }
   );
 }
 
 // ── RESET FORM ──
 function resetForm() {
-  editingQuoteId = null;
+  editingId = null;
   document.getElementById('f_docType').value = 'cotizacion';
   switchDocType();
   document.getElementById('f_quoteNum').value = '2026-CT';
@@ -992,7 +963,7 @@ function resetForm() {
   calcTotals();
 }
 
-// ── HISTORIAL RENDERING ──
+// ── HISTORIAL ──
 let histFilter = 'cotizacion';
 
 function filterHist(type, btn) {
@@ -1002,20 +973,20 @@ function filterHist(type, btn) {
   renderHistorial();
 }
 
-async function renderHistorial() {
-  const quotes = await loadQuotes();
-  const filtered = quotes.filter(q => q.type === histFilter);
+function renderHistorial() {
+  const docs = loadDocs();
+  const filtered = docs.filter(d => d.type === histFilter);
   const container = document.getElementById('histList');
 
   if(filtered.length === 0) {
-    container.innerHTML = '<div class="hist-empty">No hay documentos guardados</div>';
+    container.innerHTML = '<div class="hist-empty">No hay ' + (histFilter==='factura'?'facturas':'cotizaciones') + ' guardadas</div>';
     return;
   }
 
   container.innerHTML = filtered.map(q => {
     const isFac = q.type === 'factura';
-    const badgeClass = isFac ? 'fac' : (q.status === 'converted' ? 'conv' : 'cot');
-    const badgeText = isFac ? 'FACTURA' : (q.status === 'converted' ? 'CONVERTIDA' : 'COTIZACIÓN');
+    const badgeClass = isFac ? 'fac' : 'cot';
+    const badgeText = isFac ? 'FACTURA' : 'COTIZACIÓN';
     const total = (q.currency||'$') + (q.total||0).toFixed(2);
     return `
       <div class="hist-item ${isFac?'is-factura':''}">
@@ -1031,70 +1002,63 @@ async function renderHistorial() {
           ${q.data?.ncf ? ' · NCF: '+esc(q.data.ncf) : ''}
         </div>
         <div class="hist-actions">
-          <button class="hist-btn-edit" onclick="editQuote('${q.id}')">Editar</button>
-          ${q.type==='cotizacion' && q.status!=='converted' ? '<button class="hist-btn-convert" onclick="convertToFactura(\''+q.id+'\')">Convertir en Factura</button>' : ''}
+          <button class="hist-btn-edit" onclick="editDoc('${q.id}')">Editar</button>
+          ${!isFac ? '<button class="hist-btn-convert" onclick="convertToFactura(\''+q.id+'\')">Convertir en Factura</button>' : ''}
         </div>
       </div>
     `;
   }).join('');
 }
 
-// ── EDIT QUOTE (password protected, full edit) ──
-let editingQuoteId = null;
-
-function editQuote(id) {
-  openPwModal(async () => {
-    const q = await getQuote(id);
-    if(!q) { toast('Documento no encontrado'); return; }
-    editingQuoteId = id;
-    loadFormData(q.data);
-    // Switch to empresa tab for full editing
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
-    document.querySelector('[data-tab="empresa"]').classList.add('active');
-    document.getElementById('tab-empresa').classList.add('active');
-    toast('Editando: ' + (q.quoteNum || 'documento'));
+// ── EDITAR ──
+function editDoc(id) {
+  openPwModal(() => {
+    const docs = loadDocs();
+    const doc = docs.find(d => d.id === id);
+    if(!doc) { toast('No encontrado'); return; }
+    editingId = id;
+    loadFormData(doc.data);
+    goToTab('empresa');
+    toast('Editando: ' + (doc.quoteNum || 'documento'));
   });
 }
 
-// ── CONVERT TO FACTURA ──
+// ── CONVERTIR EN FACTURA ──
 function convertToFactura(id) {
-  openPwModal(async () => {
-    const q = await getQuote(id);
-    if(!q) { toast('Documento no encontrado'); return; }
+  openPwModal(() => {
+    const docs = loadDocs();
+    const doc = docs.find(d => d.id === id);
+    if(!doc) { toast('No encontrado'); return; }
 
     showConfirm(
       'Convertir en Factura',
-      'Se creará una nueva Factura a partir de la cotización "' + q.quoteNum + '". La cotización original se marcará como convertida.',
-      async () => {
-        const newData = {...q.data};
-        newData.docType = 'factura';
-        newData.quoteNum = (q.quoteNum || '').replace('CT', 'FT');
-        newData.ncf = '';
-        newData.date = new Date().toISOString().split('T')[0];
-        const d = new Date(); d.setDate(d.getDate()+30);
-        newData.dueDate = d.toISOString().split('T')[0];
+      'La cotización "' + doc.quoteNum + '" pasará a Facturas. Deberá completar NCF desde Editar.',
+      () => {
+        // Change type to factura, update number
+        doc.type = 'factura';
+        doc.quoteNum = (doc.quoteNum || '').replace('CT', 'FT');
+        if(doc.data) {
+          doc.data.docType = 'factura';
+          doc.data.quoteNum = doc.quoteNum;
+          doc.data.ncf = '';
+          doc.data.date = new Date().toISOString().split('T')[0];
+          const d = new Date(); d.setDate(d.getDate()+30);
+          doc.data.dueDate = d.toISOString().split('T')[0];
+        }
+        saveDocs(docs);
 
-        editingQuoteId = null; // New document, not editing existing
-        loadFormData(newData);
-
-        await updateQuoteField(id, { status: 'converted' });
-
-        // Switch to empresa tab — NCF field visible and editable
-        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
-        document.querySelector('[data-tab="empresa"]').classList.add('active');
-        document.getElementById('tab-empresa').classList.add('active');
-
-        toast('Factura creada — complete el NCF para DGII');
-        setTimeout(() => document.getElementById('f_ncf').focus(), 300);
-        await renderHistorial();
+        // Switch historial to Facturas tab
+        histFilter = 'factura';
+        document.querySelectorAll('.hist-filter button').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.hist-filter button').forEach(b => { if(b.textContent.trim()==='Facturas') b.classList.add('active'); });
+        renderHistorial();
+        toast('Convertida a Factura — edite para agregar NCF');
       }
     );
   });
 }
 
-// ── INIT HISTORIAL ──
+// ── INIT ──
 renderHistorial();
 </script>
 </body>

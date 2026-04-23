@@ -9,6 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -68,6 +70,20 @@ body{min-height:100dvh;padding-bottom:90px}
 }
 .hist-btn-edit{background:var(--navy);color:#fff}
 .hist-btn-convert{background:var(--success);color:#fff}
+.hist-btn-delete{background:var(--danger);color:#fff}
+
+/* FACTURA EDIT SECTION */
+.factura-edit{display:none;padding:20px 18px 30px}
+.factura-edit.active{display:block}
+.factura-edit .section-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dark-blue);margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid var(--blue-light)}
+.factura-edit .fe-header{background:var(--navy);color:#fff;padding:16px 18px;border-radius:12px;margin-bottom:20px}
+.factura-edit .fe-header h3{font-size:16px;letter-spacing:1px}
+.factura-edit .fe-header p{font-size:12px;opacity:.7;margin-top:4px}
+.fe-summary{background:var(--blue-light);border-radius:10px;padding:14px 16px;margin-bottom:16px}
+.fe-summary .fe-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.fe-summary .fe-row .label{color:var(--text-dim)}
+.fe-summary .fe-row .val{font-weight:600}
+.fe-summary .fe-total{font-size:18px;font-weight:700;color:var(--navy);border-top:2px solid var(--navy);margin-top:8px;padding-top:8px;text-align:right}
 .hist-filter{display:flex;gap:8px;margin-bottom:16px}
 .hist-filter button{
   flex:1;padding:10px 8px;border:1.5px solid #d0d5dd;border-radius:10px;background:var(--white);
@@ -397,6 +413,41 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
   <div id="histList"></div>
 </div>
 
+<!-- FACTURA EDIT SECTION -->
+<div class="factura-edit" id="facturaEditSection">
+  <div class="fe-header">
+    <h3 id="feTitle">Factura</h3>
+    <p id="feSubtitle"></p>
+  </div>
+
+  <div class="section-label">Datos DGII</div>
+  <div class="field"><label>NCF (Número Comprobante Fiscal)</label><input type="text" id="fe_ncf" placeholder="B0100000000"></div>
+  <div class="row-2">
+    <div class="field"><label>Fecha Factura</label><input type="date" id="fe_date"></div>
+    <div class="field"><label>Fecha Vencimiento</label><input type="date" id="fe_dueDate"></div>
+  </div>
+  <div class="field"><label>Condición de Pago</label>
+    <select id="fe_payCondition">
+      <option value="Contado">Contado</option>
+      <option value="Crédito 15 días">Crédito 15 días</option>
+      <option value="Crédito 30 días" selected>Crédito 30 días</option>
+      <option value="Crédito 45 días">Crédito 45 días</option>
+      <option value="Crédito 60 días">Crédito 60 días</option>
+    </select>
+  </div>
+
+  <div class="section-label" style="margin-top:20px">Cliente</div>
+  <div class="field"><label>Nombre / Razón Social</label><input type="text" id="fe_clientName"></div>
+  <div class="field"><label>RNC / Cédula del Cliente</label><input type="text" id="fe_clientRnc" placeholder="Requerido por DGII"></div>
+  <div class="field"><label>Contacto</label><input type="text" id="fe_clientContact"></div>
+
+  <div class="section-label" style="margin-top:20px">Resumen</div>
+  <div class="fe-summary" id="feSummary"></div>
+
+  <div class="section-label" style="margin-top:20px">Observaciones</div>
+  <div class="field"><textarea id="fe_observations" rows="3"></textarea></div>
+</div>
+
 <!-- PASSWORD MODAL -->
 <div class="modal-backdrop" id="pwModal">
   <div class="modal-box">
@@ -422,8 +473,8 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
   </div>
 </div>
 
-<!-- ACTION BAR -->
-<div class="action-bar" id="actionBar">
+<!-- ACTION BAR: COTIZACIÓN MODE -->
+<div class="action-bar" id="actionBarCot">
   <button class="btn btn-preview" onclick="completeQuote()" id="btnComplete" style="background:var(--success);color:#fff;border-color:var(--success)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
     Completar
@@ -431,6 +482,18 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
   <button class="btn btn-preview" onclick="showPreview()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
     Vista Previa
+  </button>
+</div>
+
+<!-- ACTION BAR: FACTURA MODE -->
+<div class="action-bar" id="actionBarFac" style="display:none">
+  <button class="btn" onclick="closeFacturaEdit()" style="background:#eee;color:var(--text)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/></svg>
+    Volver
+  </button>
+  <button class="btn btn-preview" onclick="downloadFactura()" style="background:var(--navy)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Descargar Factura
   </button>
 </div>
 
@@ -447,6 +510,31 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
 </div>
 
 <script>
+// ═══════════════════════════════════════════════════════
+// FIREBASE — Paste config from Firebase Console
+// ═══════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "",   // ← Firebase Console → Project Settings
+  authDomain:        "",   // ← ejemplo: inverssys-app.firebaseapp.com
+  projectId:         "",   // ← ejemplo: inverssys-app
+  storageBucket:     "",   // ← ejemplo: inverssys-app.appspot.com
+  messagingSenderId: "",   // ← Sender ID
+  appId:             ""    // ← App ID
+};
+// Firebase will initialize only if config is filled
+let fbEnabled = false;
+let fbDb = null;
+if(firebaseConfig.apiKey && firebaseConfig.projectId) {
+  try {
+    firebase.initializeApp(firebaseConfig);
+    fbDb = firebase.firestore();
+    fbEnabled = true;
+    console.log('Firebase connected ✓');
+  } catch(e) { console.warn('Firebase init failed:', e); }
+} else {
+  console.log('Firebase not configured — using localStorage only');
+}
+
 // ── INIT ──
 const today = new Date();
 document.getElementById('f_date').value = today.toISOString().split('T')[0];
@@ -475,16 +563,6 @@ function switchDocType() {
   if(isFact && numField.value.startsWith('2026-CT')) numField.value = '2026-FT';
   if(!isFact && numField.value.startsWith('2026-FT')) numField.value = '2026-CT';
 }
-
-// ── TABS ──
-document.querySelectorAll('.nav-tab').forEach(tab => {
-  tab.addEventListener('click', function(){
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
-    this.classList.add('active');
-    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-  });
-});
 
 // ── LINE ITEMS ──
 let lineItems = [];
@@ -810,7 +888,7 @@ function showConfirm(title, msg, onOk) {
 }
 function closeConfirm() { document.getElementById('confirmModal').classList.remove('show'); }
 
-// ── STORAGE (localStorage) ──
+// ── STORAGE ──
 const STORE_KEY = 'inverssys_docs';
 function loadDocs() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
@@ -818,9 +896,13 @@ function loadDocs() {
 }
 function saveDocs(docs) {
   localStorage.setItem(STORE_KEY, JSON.stringify(docs));
+  // Sync to Firebase if enabled
+  if(fbEnabled && fbDb) {
+    docs.forEach(d => fbDb.collection('cotizaciones').doc(d.id).set(d).catch(()=>{}));
+  }
 }
 
-// ── COLLECT FORM DATA ──
+// ── COLLECT / LOAD FORM DATA ──
 function collectFormData() {
   return {
     docType: getDocType(),
@@ -848,7 +930,6 @@ function collectFormData() {
   };
 }
 
-// ── LOAD FORM DATA ──
 function loadFormData(data) {
   document.getElementById('f_docType').value = data.docType || 'cotizacion';
   switchDocType();
@@ -881,15 +962,40 @@ function loadFormData(data) {
   calcTotals();
 }
 
-// ── SWITCH TO TAB ──
+// ── UI MODES ──
+function showCotMode() {
+  document.getElementById('actionBarCot').style.display = '';
+  document.getElementById('actionBarFac').style.display = 'none';
+  document.getElementById('facturaEditSection').classList.remove('active');
+  document.querySelector('.nav-tabs').style.display = '';
+}
+function showFacturaMode() {
+  document.getElementById('actionBarCot').style.display = 'none';
+  document.getElementById('actionBarFac').style.display = '';
+  document.getElementById('facturaEditSection').classList.add('active');
+  // Hide all tabs and form sections
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+  document.querySelector('.nav-tabs').style.display = 'none';
+}
+function showHistMode() {
+  document.getElementById('actionBarCot').style.display = 'none';
+  document.getElementById('actionBarFac').style.display = 'none';
+  document.getElementById('facturaEditSection').classList.remove('active');
+  document.querySelector('.nav-tabs').style.display = '';
+}
+
 function goToTab(tabName) {
+  showCotMode();
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
   document.querySelector('[data-tab="'+tabName+'"]').classList.add('active');
   document.getElementById('tab-'+tabName).classList.add('active');
+  // Hide action bar on historial
+  if(tabName === 'historial') showHistMode();
 }
 
-// ── COMPLETAR ──
+// ── COMPLETAR (cotización) ──
 let editingId = null;
 
 function completeQuote() {
@@ -897,23 +1003,20 @@ function completeQuote() {
   if(!data.quoteNum) { toast('Falta el número de documento'); return; }
   if(!data.projName) { toast('Falta el nombre del cliente/proyecto'); return; }
 
-  const docLabel = data.docType === 'factura' ? 'Factura' : 'Cotización';
-
   if(data.docType === 'factura') {
     if(!data.clientRnc) { toast('DGII requiere RNC/Cédula del cliente'); return; }
     if(!data.ncf) { toast('DGII requiere NCF para facturas'); return; }
   }
 
-  const action = editingId ? 'Actualizar' : 'Completar';
-  showConfirm(
-    action + ' ' + docLabel,
-    '¿' + action + ' "' + data.quoteNum + ' — ' + data.projName + '"?',
+  const label = editingId ? 'Actualizar' : 'Completar';
+  showConfirm(label + ' Cotización',
+    '¿' + label + ' "' + data.quoteNum + ' — ' + data.projName + '"?',
     async () => {
       const docs = loadDocs();
       const sub = lineItems.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.price)||0), 0);
       const entry = {
         id: editingId || (Date.now().toString(36) + Math.random().toString(36).substr(2,4)),
-        type: data.docType,
+        type: 'cotizacion',
         quoteNum: data.quoteNum,
         clientName: data.projName,
         total: sub * 1.18,
@@ -921,27 +1024,23 @@ function completeQuote() {
         createdAt: data.date || new Date().toISOString().split('T')[0],
         data: data
       };
-
       if(editingId) {
         const idx = docs.findIndex(d => d.id === editingId);
         if(idx >= 0) docs[idx] = entry; else docs.unshift(entry);
-      } else {
-        docs.unshift(entry);
-      }
+      } else { docs.unshift(entry); }
       saveDocs(docs);
 
       toast('Generando PDF...');
       await downloadPDF();
-      toast(docLabel + (editingId ? ' actualizada ✓' : ' guardada ✓'));
-
+      toast('Cotización ' + (editingId ? 'actualizada ✓' : 'guardada ✓'));
       resetForm();
+      histFilter = 'cotizacion';
       renderHistorial();
       goToTab('historial');
     }
   );
 }
 
-// ── RESET FORM ──
 function resetForm() {
   editingId = null;
   document.getElementById('f_docType').value = 'cotizacion';
@@ -988,6 +1087,18 @@ function renderHistorial() {
     const badgeClass = isFac ? 'fac' : 'cot';
     const badgeText = isFac ? 'FACTURA' : 'COTIZACIÓN';
     const total = (q.currency||'$') + (q.total||0).toFixed(2);
+
+    let buttons = '';
+    if(isFac) {
+      buttons = `
+        <button class="hist-btn-edit" onclick="editFactura('${q.id}')">Editar</button>
+        <button class="hist-btn-delete" onclick="deleteDoc('${q.id}')">Eliminar</button>`;
+    } else {
+      buttons = `
+        <button class="hist-btn-edit" onclick="editCotizacion('${q.id}')">Editar</button>
+        <button class="hist-btn-convert" onclick="convertToFactura('${q.id}')">Convertir en Factura</button>`;
+    }
+
     return `
       <div class="hist-item ${isFac?'is-factura':''}">
         <div class="hist-item-top">
@@ -1001,17 +1112,14 @@ function renderHistorial() {
           ${fmtDate(q.createdAt)} · <span class="hist-item-total">${total}</span>
           ${q.data?.ncf ? ' · NCF: '+esc(q.data.ncf) : ''}
         </div>
-        <div class="hist-actions">
-          <button class="hist-btn-edit" onclick="editDoc('${q.id}')">Editar</button>
-          ${!isFac ? '<button class="hist-btn-convert" onclick="convertToFactura(\''+q.id+'\')">Convertir en Factura</button>' : ''}
-        </div>
+        <div class="hist-actions">${buttons}</div>
       </div>
     `;
   }).join('');
 }
 
-// ── EDITAR ──
-function editDoc(id) {
+// ── EDIT COTIZACIÓN (loads into form tabs) ──
+function editCotizacion(id) {
   openPwModal(() => {
     const docs = loadDocs();
     const doc = docs.find(d => d.id === id);
@@ -1023,18 +1131,106 @@ function editDoc(id) {
   });
 }
 
-// ── CONVERTIR EN FACTURA ──
+// ── EDIT FACTURA (dedicated factura platform) ──
+let editingFacturaId = null;
+
+function editFactura(id) {
+  openPwModal(() => {
+    const docs = loadDocs();
+    const doc = docs.find(d => d.id === id);
+    if(!doc || !doc.data) { toast('No encontrado'); return; }
+    editingFacturaId = id;
+    const d = doc.data;
+
+    document.getElementById('feTitle').textContent = 'Factura ' + (d.quoteNum || '');
+    document.getElementById('feSubtitle').textContent = (d.projName || '') + (d.clientRnc ? ' · RNC: '+d.clientRnc : '');
+    document.getElementById('fe_ncf').value = d.ncf || '';
+    document.getElementById('fe_date').value = d.date || '';
+    document.getElementById('fe_dueDate').value = d.dueDate || '';
+    document.getElementById('fe_payCondition').value = d.payCondition || 'Crédito 30 días';
+    document.getElementById('fe_clientName').value = d.projName || '';
+    document.getElementById('fe_clientRnc').value = d.clientRnc || '';
+    document.getElementById('fe_clientContact').value = d.projContact || '';
+    document.getElementById('fe_observations').value = d.observations || '';
+
+    // Render line items summary
+    const cur = d.currency === 'DOP' ? 'RD$' : '$';
+    let sub = 0;
+    const itemRows = (d.lineItems || []).map(li => {
+      const imp = (parseFloat(li.qty)||0) * (parseFloat(li.price)||0);
+      sub += imp;
+      return '<div class="fe-row"><span class="label">' + esc(li.desc||'—') + ' × ' + (li.qty||0) + '</span><span class="val">' + cur + imp.toFixed(2) + '</span></div>';
+    }).join('');
+    const tax = sub * 0.18;
+    document.getElementById('feSummary').innerHTML = itemRows +
+      '<div class="fe-row"><span class="label">Subtotal</span><span class="val">' + cur + sub.toFixed(2) + '</span></div>' +
+      '<div class="fe-row"><span class="label">ITBIS 18%</span><span class="val">' + cur + tax.toFixed(2) + '</span></div>' +
+      '<div class="fe-total">' + cur + (sub+tax).toFixed(2) + '</div>';
+
+    showFacturaMode();
+    toast('Editando factura');
+  });
+}
+
+function closeFacturaEdit() {
+  editingFacturaId = null;
+  showHistMode();
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+  document.querySelector('[data-tab="historial"]').classList.add('active');
+  document.getElementById('tab-historial').classList.add('active');
+  document.querySelector('.nav-tabs').style.display = '';
+  histFilter = 'factura';
+  document.querySelectorAll('.hist-filter button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.hist-filter button').forEach(b => { if(b.textContent.trim()==='Facturas') b.classList.add('active'); });
+  renderHistorial();
+}
+
+// ── DOWNLOAD FACTURA PDF ──
+async function downloadFactura() {
+  if(!editingFacturaId) return;
+  const docs = loadDocs();
+  const idx = docs.findIndex(d => d.id === editingFacturaId);
+  if(idx < 0) { toast('No encontrado'); return; }
+
+  // Save factura edits back
+  const doc = docs[idx];
+  const d = doc.data;
+  d.ncf = document.getElementById('fe_ncf').value;
+  d.date = document.getElementById('fe_date').value;
+  d.dueDate = document.getElementById('fe_dueDate').value;
+  d.payCondition = document.getElementById('fe_payCondition').value;
+  d.projName = document.getElementById('fe_clientName').value;
+  d.clientRnc = document.getElementById('fe_clientRnc').value;
+  d.projContact = document.getElementById('fe_clientContact').value;
+  d.observations = document.getElementById('fe_observations').value;
+  d.docType = 'factura';
+  doc.clientName = d.projName;
+  docs[idx] = doc;
+  saveDocs(docs);
+
+  // DGII validation
+  if(!d.clientRnc) { toast('DGII requiere RNC/Cédula del cliente'); return; }
+  if(!d.ncf) { toast('DGII requiere NCF para descargar factura'); return; }
+
+  // Load into hidden form to generate PDF
+  loadFormData(d);
+  toast('Generando Factura PDF...');
+  await downloadPDF();
+  toast('Factura descargada ✓');
+  resetForm();
+}
+
+// ── CONVERT COTIZACIÓN → FACTURA ──
 function convertToFactura(id) {
   openPwModal(() => {
     const docs = loadDocs();
     const doc = docs.find(d => d.id === id);
     if(!doc) { toast('No encontrado'); return; }
 
-    showConfirm(
-      'Convertir en Factura',
-      'La cotización "' + doc.quoteNum + '" pasará a Facturas. Deberá completar NCF desde Editar.',
+    showConfirm('Convertir en Factura',
+      'La cotización "' + doc.quoteNum + '" pasará a Facturas.',
       () => {
-        // Change type to factura, update number
         doc.type = 'factura';
         doc.quoteNum = (doc.quoteNum || '').replace('CT', 'FT');
         if(doc.data) {
@@ -1046,17 +1242,46 @@ function convertToFactura(id) {
           doc.data.dueDate = d.toISOString().split('T')[0];
         }
         saveDocs(docs);
-
-        // Switch historial to Facturas tab
         histFilter = 'factura';
         document.querySelectorAll('.hist-filter button').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.hist-filter button').forEach(b => { if(b.textContent.trim()==='Facturas') b.classList.add('active'); });
         renderHistorial();
-        toast('Convertida a Factura — edite para agregar NCF');
+        toast('Convertida a Factura ✓');
       }
     );
   });
 }
+
+// ── DELETE (facturas only) ──
+function deleteDoc(id) {
+  openPwModal(() => {
+    showConfirm('Eliminar Factura', '¿Está seguro? Esta acción no se puede deshacer.', () => {
+      let docs = loadDocs();
+      docs = docs.filter(d => d.id !== id);
+      saveDocs(docs);
+      if(fbEnabled && fbDb) fbDb.collection('cotizaciones').doc(id).delete().catch(()=>{});
+      renderHistorial();
+      toast('Factura eliminada');
+    });
+  });
+}
+
+// ── TAB CLICKS (override to handle action bar) ──
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.removeEventListener('click', tab._handler);
+  tab._handler = function() {
+    const t = this.dataset.tab;
+    document.querySelectorAll('.nav-tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('tab-'+t).classList.add('active');
+    document.getElementById('facturaEditSection').classList.remove('active');
+    if(t === 'historial') { showHistMode(); document.querySelector('.nav-tabs').style.display = ''; }
+    else showCotMode();
+    window.scrollTo(0,0);
+  };
+  tab.addEventListener('click', tab._handler);
+});
 
 // ── INIT ──
 renderHistorial();

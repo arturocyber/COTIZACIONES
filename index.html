@@ -20,16 +20,6 @@
 }
 html{font-family:'DM Sans',system-ui,sans-serif;font-size:15px;color:var(--text);background:var(--bg)}
 body{min-height:100dvh;padding-bottom:90px}
-body.readonly-mode .form-section input,
-body.readonly-mode .form-section select,
-body.readonly-mode .form-section textarea{pointer-events:none;opacity:.75;background:#f5f5f5}
-body.readonly-mode .add-line-btn,
-body.readonly-mode .remove-btn{display:none}
-.readonly-banner{
-  display:none;background:#ffeeba;color:#856404;text-align:center;padding:10px 16px;
-  font-size:13px;font-weight:600;letter-spacing:.3px;
-}
-body.readonly-mode .readonly-banner{display:block}
 
 /* MODAL */
 .modal-backdrop{
@@ -79,9 +69,8 @@ body.readonly-mode .readonly-banner{display:block}
   padding:8px 14px;border:none;border-radius:8px;font-family:inherit;
   font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.3px;
 }
-.hist-btn-view{background:var(--navy);color:#fff}
+.hist-btn-edit{background:var(--navy);color:#fff}
 .hist-btn-convert{background:var(--success);color:#fff}
-.hist-btn-delete{background:none;color:var(--danger);text-decoration:underline;font-size:11px}
 .hist-filter{display:flex;gap:8px;margin-bottom:16px}
 .hist-filter button{
   flex:1;padding:10px 8px;border:1.5px solid #d0d5dd;border-radius:10px;background:var(--white);
@@ -303,9 +292,6 @@ body.readonly-mode .readonly-banner{display:block}
   <button class="nav-tab" data-tab="historial" style="color:var(--success)">HISTORIAL</button>
 </div>
 
-<!-- READ-ONLY BANNER -->
-<div class="readonly-banner" id="readonlyBanner">🔒 Vista de solo lectura — <a href="#" onclick="exitReadonly();return false" style="color:inherit;font-weight:700">Cerrar</a></div>
-
 <!-- TAB: EMPRESA -->
 <div id="tab-empresa" class="form-section active">
   <div class="section-label">Datos de la Empresa</div>
@@ -464,16 +450,18 @@ PROPUESTA VALIDA POR 7 DIAS.</textarea>
 </div>
 
 <script>
-// ── FIREBASE CONFIG ──
-// TODO: Replace with your Firebase project config
-firebase.initializeApp({
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-});
+// ═══════════════════════════════════════════════════════
+// FIREBASE CONFIG — Firebase Console → Project Settings
+// ═══════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "",  // ← Tu API Key
+  authDomain:        "",  // ← ejemplo: inverssys-app.firebaseapp.com
+  projectId:         "",  // ← ejemplo: inverssys-app
+  storageBucket:     "",  // ← ejemplo: inverssys-app.appspot.com
+  messagingSenderId: "",  // ← Tu Sender ID
+  appId:             ""   // ← Tu App ID
+};
+firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const quotesCol = db.collection('cotizaciones');
 
@@ -726,14 +714,60 @@ function closePreview() {
 // ── PDF DOWNLOAD ──
 async function downloadPDF() {
   toast('Generando PDF...');
-  const el = document.getElementById('pdfRender');
   try {
-    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    // Create off-screen render container for clean capture
+    const offscreen = document.createElement('div');
+    offscreen.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;width:680px;';
+    offscreen.innerHTML = '<div id="pdfRenderOff" style="background:#fff;color:#1a1a2e;max-width:680px;border-radius:6px;overflow:hidden;font-family:DM Sans,sans-serif;">' + buildPdfHtml() + '</div>';
+    document.body.appendChild(offscreen);
+    const el = document.getElementById('pdfRenderOff');
+
+    // Wait for images to load
+    await new Promise(r => setTimeout(r, 300));
+
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      width: 680,
+      windowWidth: 680
+    });
+
+    document.body.removeChild(offscreen);
+
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p','mm','letter');
-    const imgW = 216 - 20; // letter width minus margins
+    const pdf = new jsPDF('p', 'mm', 'letter');
+    const pageW = 216; // letter width mm
+    const pageH = 279; // letter height mm
+    const margin = 10;
+    const imgW = pageW - margin * 2;
     const imgH = (canvas.height * imgW) / canvas.width;
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 10, 10, imgW, imgH);
+
+    if (imgH <= pageH - margin * 2) {
+      // Single page
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, imgW, imgH);
+    } else {
+      // Multi-page: slice the canvas
+      const usableH = pageH - margin * 2;
+      const sliceH = Math.floor((canvas.height * usableH) / imgH);
+      let y = 0;
+      let page = 0;
+
+      while (y < canvas.height) {
+        if (page > 0) pdf.addPage();
+        const h = Math.min(sliceH, canvas.height - y);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = h;
+        const ctx = sliceCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        const sliceImgH = (h * imgW) / canvas.width;
+        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, imgW, sliceImgH);
+        y += h;
+        page++;
+      }
+    }
+
     const qNum = document.getElementById('f_quoteNum').value || 'cotizacion';
     const projName = document.getElementById('f_projName').value || '';
     const docLabel = getDocType() === 'factura' ? 'Factura' : 'Cotizacion';
@@ -741,7 +775,7 @@ async function downloadPDF() {
     pdf.save(fname);
     toast('PDF descargado ✓');
   } catch(e) {
-    console.error(e);
+    console.error('PDF error:', e);
     toast('Error generando PDF');
   }
 }
@@ -901,13 +935,18 @@ function completeQuote() {
     if(!data.ncf) { toast('DGII requiere NCF para facturas'); return; }
   }
 
+  const isEdit = !!editingQuoteId;
+  const confirmMsg = isEdit
+    ? '¿Actualizar "' + data.quoteNum + ' — ' + data.projName + '" y generar PDF?'
+    : '¿Guardar "' + data.quoteNum + ' — ' + data.projName + '" y generar PDF?';
+
   showConfirm(
-    'Completar ' + docLabel,
-    '¿Guardar "' + data.quoteNum + ' — ' + data.projName + '" como completada? Una vez guardada será de solo lectura.',
+    (isEdit ? 'Actualizar ' : 'Completar ') + docLabel,
+    confirmMsg,
     async () => {
       const sub = lineItems.reduce((s,i) => s + (parseFloat(i.qty)||0)*(parseFloat(i.price)||0), 0);
       const entry = {
-        id: Date.now().toString(36) + Math.random().toString(36).substr(2,4),
+        id: editingQuoteId || (Date.now().toString(36) + Math.random().toString(36).substr(2,4)),
         type: data.docType,
         status: 'completed',
         quoteNum: data.quoteNum,
@@ -919,9 +958,9 @@ function completeQuote() {
         data: data
       };
       await saveQuote(entry);
-      toast(docLabel + ' guardada ✓');
+      toast(docLabel + (isEdit ? ' actualizada' : ' guardada') + ' — generando PDF...');
+      await downloadPDF();
       await renderHistorial();
-      // Switch to historial tab
       document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
       document.querySelector('[data-tab="historial"]').classList.add('active');
@@ -933,6 +972,7 @@ function completeQuote() {
 
 // ── RESET FORM ──
 function resetForm() {
+  editingQuoteId = null;
   document.getElementById('f_docType').value = 'cotizacion';
   switchDocType();
   document.getElementById('f_quoteNum').value = '2026-CT';
@@ -950,7 +990,6 @@ function resetForm() {
   lineItems = []; itemIdCounter = 0;
   addLineItem(); addLineItem(); addLineItem();
   calcTotals();
-  exitReadonly();
 }
 
 // ── HISTORIAL RENDERING ──
@@ -992,39 +1031,30 @@ async function renderHistorial() {
           ${q.data?.ncf ? ' · NCF: '+esc(q.data.ncf) : ''}
         </div>
         <div class="hist-actions">
-          <button class="hist-btn-view" onclick="viewQuote('${q.id}')">Ver</button>
+          <button class="hist-btn-edit" onclick="editQuote('${q.id}')">Editar</button>
           ${q.type==='cotizacion' && q.status!=='converted' ? '<button class="hist-btn-convert" onclick="convertToFactura(\''+q.id+'\')">Convertir en Factura</button>' : ''}
-          <button class="hist-btn-delete" onclick="deleteQuote('${q.id}')">Eliminar</button>
         </div>
       </div>
     `;
   }).join('');
 }
 
-// ── VIEW QUOTE (password protected, read-only) ──
-function viewQuote(id) {
+// ── EDIT QUOTE (password protected, full edit) ──
+let editingQuoteId = null;
+
+function editQuote(id) {
   openPwModal(async () => {
     const q = await getQuote(id);
     if(!q) { toast('Documento no encontrado'); return; }
+    editingQuoteId = id;
     loadFormData(q.data);
-    enterReadonly();
-    // Switch to empresa tab
+    // Switch to empresa tab for full editing
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
     document.querySelector('[data-tab="empresa"]').classList.add('active');
     document.getElementById('tab-empresa').classList.add('active');
-    toast('Documento cargado (solo lectura)');
+    toast('Editando: ' + (q.quoteNum || 'documento'));
   });
-}
-
-function enterReadonly() {
-  document.body.classList.add('readonly-mode');
-  document.getElementById('btnComplete').style.display = 'none';
-}
-
-function exitReadonly() {
-  document.body.classList.remove('readonly-mode');
-  document.getElementById('btnComplete').style.display = '';
 }
 
 // ── CONVERT TO FACTURA ──
@@ -1037,22 +1067,18 @@ function convertToFactura(id) {
       'Convertir en Factura',
       'Se creará una nueva Factura a partir de la cotización "' + q.quoteNum + '". La cotización original se marcará como convertida.',
       async () => {
-        // Load data into form as factura
         const newData = {...q.data};
         newData.docType = 'factura';
-        // Generate factura number from cotización number
         newData.quoteNum = (q.quoteNum || '').replace('CT', 'FT');
-        newData.ncf = ''; // NCF must be filled by user
+        newData.ncf = '';
         newData.date = new Date().toISOString().split('T')[0];
         const d = new Date(); d.setDate(d.getDate()+30);
         newData.dueDate = d.toISOString().split('T')[0];
 
+        editingQuoteId = null; // New document, not editing existing
         loadFormData(newData);
 
-        // Mark original as converted in Firestore
         await updateQuoteField(id, { status: 'converted' });
-
-        exitReadonly();
 
         // Switch to empresa tab — NCF field visible and editable
         document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -1061,22 +1087,10 @@ function convertToFactura(id) {
         document.getElementById('tab-empresa').classList.add('active');
 
         toast('Factura creada — complete el NCF para DGII');
-        // Scroll to NCF field
         setTimeout(() => document.getElementById('f_ncf').focus(), 300);
         await renderHistorial();
       }
     );
-  });
-}
-
-// ── DELETE QUOTE ──
-function deleteQuote(id) {
-  openPwModal(async () => {
-    showConfirm('Eliminar documento', '¿Está seguro? Esta acción no se puede deshacer.', async () => {
-      await deleteQuoteFromDb(id);
-      toast('Documento eliminado');
-      await renderHistorial();
-    });
   });
 }
 

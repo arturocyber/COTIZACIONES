@@ -455,6 +455,7 @@ function collectFormData() {
     projLocation: document.getElementById('f_projLocation').value,
     projContact: document.getElementById('f_projContact').value,
     projArea: document.getElementById('f_projArea').value,
+    refTag: document.getElementById('f_refTag').value,
     payTerms: document.getElementById('f_payTerms').value,
     observations: document.getElementById('f_observations').value,
     lineItems: lineItems.map(i => ({code:i.code,desc:i.desc,qty:i.qty,price:i.price}))
@@ -485,6 +486,7 @@ function loadFormData(data) {
   document.getElementById('f_projLocation').value = data.projLocation || '';
   document.getElementById('f_projContact').value = data.projContact || '';
   document.getElementById('f_projArea').value = data.projArea || '';
+  document.getElementById('f_refTag').value = data.refTag || '';
   document.getElementById('f_payTerms').value = data.payTerms || '';
   document.getElementById('f_observations').value = data.observations || '';
   lineItems = []; itemIdCounter = 0;
@@ -550,6 +552,7 @@ function completeQuote() {
         type: 'cotizacion',
         quoteNum: data.quoteNum,
         clientName: data.projName,
+        refTag: data.refTag || '',
         total: sub * 1.18,
         currency: data.currency === 'DOP' ? 'RD$' : '$',
         createdAt: data.date || new Date().toISOString().split('T')[0],
@@ -586,6 +589,7 @@ function resetForm() {
   document.getElementById('f_projLocation').value = '';
   document.getElementById('f_projContact').value = '';
   document.getElementById('f_projArea').value = '';
+  document.getElementById('f_refTag').value = '';
   document.getElementById('f_payTerms').value = '50% con la orden de trabajo.\n50% con la entrega.';
   document.getElementById('f_observations').value = 'TIEMPO DE ESPERA 45 DIAS LABORABLES\nPROPUESTA VALIDA POR 7 DIAS.';
   lineItems = []; itemIdCounter = 0;
@@ -637,6 +641,7 @@ function renderHistorial() {
           <div>
             <div class="hist-item-num">${esc(q.quoteNum)}</div>
             <div class="hist-item-client">${esc(q.clientName||'—')}</div>
+            ${q.refTag ? '<div class="hist-item-tag">'+esc(q.refTag)+'</div>' : ''}
           </div>
           <span class="hist-badge ${badgeClass}">${badgeText}</span>
         </div>

@@ -41,6 +41,7 @@ body{min-height:100dvh;padding-bottom:90px}
 .hist-item-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
 .hist-item-num{font-weight:700;font-size:15px;color:var(--navy)}
 .hist-item-client{font-size:13px;color:var(--text-dim);margin-top:2px}
+.hist-item-tag{display:inline-block;font-size:10px;font-weight:600;color:var(--dark-blue);background:var(--blue-light);padding:2px 8px;border-radius:4px;margin-top:4px;letter-spacing:.3px}
 .hist-badge{
   font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
   padding:4px 10px;border-radius:20px;white-space:nowrap;

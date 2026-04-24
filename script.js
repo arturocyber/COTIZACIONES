@@ -12,15 +12,66 @@ const firebaseConfig = {
 // Firebase will initialize only if config is filled
 let fbEnabled = false;
 let fbDb = null;
+let fbAuth = null;
 if(firebaseConfig.apiKey && firebaseConfig.projectId) {
   try {
     firebase.initializeApp(firebaseConfig);
     fbDb = firebase.firestore();
+    fbAuth = firebase.auth();
     fbEnabled = true;
     console.log('Firebase connected ✓');
   } catch(e) { console.warn('Firebase init failed:', e); }
 } else {
   console.log('Firebase not configured — using localStorage only');
+}
+
+// ── AUTH ──
+function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+
+  if(!email || !pass) { errEl.textContent = 'Complete ambos campos'; return; }
+  if(!fbAuth) { errEl.textContent = 'Firebase no configurado'; return; }
+
+  document.getElementById('loginBtn').textContent = 'Ingresando...';
+  fbAuth.signInWithEmailAndPassword(email, pass)
+    .then(() => { showApp(); })
+    .catch(err => {
+      document.getElementById('loginBtn').textContent = 'Ingresar';
+      if(err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        errEl.textContent = 'Correo o contraseña incorrecta';
+      } else if(err.code === 'auth/invalid-email') {
+        errEl.textContent = 'Correo inválido';
+      } else {
+        errEl.textContent = 'Error: ' + err.message;
+      }
+    });
+}
+
+function showApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appMain').style.display = '';
+}
+
+// Check if already logged in
+if(fbAuth) {
+  fbAuth.onAuthStateChanged(user => {
+    if(user) { showApp(); }
+  });
+}
+
+// Enter key on login fields
+document.getElementById('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('loginEmail').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginPass').focus(); });
+
+function doLogout() {
+  if(fbAuth) fbAuth.signOut();
+  document.getElementById('appMain').style.display = 'none';
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').textContent = '';
 }
 
 // ── INIT ──

@@ -207,6 +207,8 @@ function buildPdfHtml() {
   const projName = document.getElementById('f_projName').value;
   const projLoc = document.getElementById('f_projLocation').value;
   const projContact = document.getElementById('f_projContact').value;
+  const projPhone = document.getElementById('f_projPhone').value;
+  const projEmail = document.getElementById('f_projEmail').value;
   const projArea = document.getElementById('f_projArea').value;
   const payTerms = document.getElementById('f_payTerms').value;
   const observations = document.getElementById('f_observations').value;
@@ -249,7 +251,7 @@ function buildPdfHtml() {
         </div>
         <div class="pdf-meta-block">
           <h4>Proyecto / Cliente</h4>
-          <p>${projName||'—'}${clientRnc ? '<br>RNC: '+clientRnc : ''}<br>${projLoc||''}<br>${projContact||''}<br>${projArea ? 'Área: '+projArea : ''}</p>
+          <p>${projName||'—'}${clientRnc ? '<br>RNC: '+clientRnc : ''}<br>${projLoc||''}<br>${projContact||''}${projPhone ? '<br>Tel: '+projPhone : ''}${projEmail ? '<br>'+projEmail : ''}${projArea ? '<br>Área: '+projArea : ''}</p>
         </div>
       </div>
       <table class="pdf-table">
@@ -454,6 +456,8 @@ function collectFormData() {
     projName: document.getElementById('f_projName').value,
     projLocation: document.getElementById('f_projLocation').value,
     projContact: document.getElementById('f_projContact').value,
+    projPhone: document.getElementById('f_projPhone').value,
+    projEmail: document.getElementById('f_projEmail').value,
     projArea: document.getElementById('f_projArea').value,
     refTag: document.getElementById('f_refTag').value,
     payTerms: document.getElementById('f_payTerms').value,
@@ -485,6 +489,8 @@ function loadFormData(data) {
   document.getElementById('f_projName').value = data.projName || '';
   document.getElementById('f_projLocation').value = data.projLocation || '';
   document.getElementById('f_projContact').value = data.projContact || '';
+  document.getElementById('f_projPhone').value = data.projPhone || '';
+  document.getElementById('f_projEmail').value = data.projEmail || '';
   document.getElementById('f_projArea').value = data.projArea || '';
   document.getElementById('f_refTag').value = data.refTag || '';
   document.getElementById('f_payTerms').value = data.payTerms || '';
@@ -588,6 +594,8 @@ function resetForm() {
   document.getElementById('f_projName').value = '';
   document.getElementById('f_projLocation').value = '';
   document.getElementById('f_projContact').value = '';
+  document.getElementById('f_projPhone').value = '';
+  document.getElementById('f_projEmail').value = '';
   document.getElementById('f_projArea').value = '';
   document.getElementById('f_refTag').value = '';
   document.getElementById('f_payTerms').value = '50% con la orden de trabajo.\n50% con la entrega.';

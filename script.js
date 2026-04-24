@@ -24,7 +24,7 @@ if(firebaseConfig.apiKey && firebaseConfig.projectId) {
 }
 
 // ── AUTH (password-only) ──
-const ACCESS_KEY = 'inverssys2026';
+const ACCESS_KEY = 'csirt@';
 
 function doLogin() {
   const pass = document.getElementById('loginPass').value;

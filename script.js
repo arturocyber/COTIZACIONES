@@ -12,12 +12,10 @@ const firebaseConfig = {
 // Firebase will initialize only if config is filled
 let fbEnabled = false;
 let fbDb = null;
-let fbAuth = null;
 if(firebaseConfig.apiKey && firebaseConfig.projectId) {
   try {
     firebase.initializeApp(firebaseConfig);
     fbDb = firebase.firestore();
-    fbAuth = firebase.auth();
     fbEnabled = true;
     console.log('Firebase connected ✓');
   } catch(e) { console.warn('Firebase init failed:', e); }
@@ -25,29 +23,25 @@ if(firebaseConfig.apiKey && firebaseConfig.projectId) {
   console.log('Firebase not configured — using localStorage only');
 }
 
-// ── AUTH ──
+// ── AUTH (password-only) ──
+const ACCESS_KEY = 'inverssys2026';
+
 function doLogin() {
-  const email = document.getElementById('loginEmail').value.trim();
   const pass = document.getElementById('loginPass').value;
   const errEl = document.getElementById('loginError');
   errEl.textContent = '';
 
-  if(!email || !pass) { errEl.textContent = 'Complete ambos campos'; return; }
-  if(!fbAuth) { errEl.textContent = 'Firebase no configurado'; return; }
+  if(!pass) { errEl.textContent = 'Ingrese la clave de acceso'; return; }
 
-  document.getElementById('loginBtn').textContent = 'Ingresando...';
-  fbAuth.signInWithEmailAndPassword(email, pass)
-    .then(() => { showApp(); })
-    .catch(err => {
-      document.getElementById('loginBtn').textContent = 'Ingresar';
-      if(err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        errEl.textContent = 'Correo o contraseña incorrecta';
-      } else if(err.code === 'auth/invalid-email') {
-        errEl.textContent = 'Correo inválido';
-      } else {
-        errEl.textContent = 'Error: ' + err.message;
-      }
-    });
+  document.getElementById('loginBtn').textContent = 'Verificando...';
+
+  if(pass === ACCESS_KEY) {
+    sessionStorage.setItem('inverssys_auth', '1');
+    showApp();
+  } else {
+    document.getElementById('loginBtn').textContent = 'Ingresar';
+    errEl.textContent = 'Clave incorrecta';
+  }
 }
 
 function showApp() {
@@ -55,23 +49,21 @@ function showApp() {
   document.getElementById('appMain').style.display = '';
 }
 
-// Check if already logged in
-if(fbAuth) {
-  fbAuth.onAuthStateChanged(user => {
-    if(user) { showApp(); }
-  });
+// Check if already authenticated this session
+if(sessionStorage.getItem('inverssys_auth') === '1') {
+  showApp();
 }
 
-// Enter key on login fields
+// Enter key on password field
 document.getElementById('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
-document.getElementById('loginEmail').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginPass').focus(); });
 
 function doLogout() {
-  if(fbAuth) fbAuth.signOut();
+  sessionStorage.removeItem('inverssys_auth');
   document.getElementById('appMain').style.display = 'none';
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('loginPass').value = '';
   document.getElementById('loginError').textContent = '';
+  document.getElementById('loginBtn').textContent = 'Ingresar';
 }
 
 // ── INIT ──

@@ -10,7 +10,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -44,12 +43,8 @@
         <p>Plataforma de Cotizaciones y Facturas</p>
       </div>
       <div class="login-field">
-        <label>Correo electrónico</label>
-        <input type="email" id="loginEmail" placeholder="usuario@inverssys.com" autocomplete="email">
-      </div>
-      <div class="login-field">
-        <label>Contraseña</label>
-        <input type="password" id="loginPass" placeholder="Ingrese su contraseña" autocomplete="current-password">
+        <label>Clave de Acceso</label>
+        <input type="password" id="loginPass" placeholder="Ingrese la clave" autocomplete="current-password">
       </div>
       <button onclick="doLogin()" id="loginBtn">Ingresar</button>
       <div class="login-error" id="loginError"></div>

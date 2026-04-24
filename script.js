@@ -264,11 +264,11 @@ function buildPdfHtml() {
       <div class="pdf-terms">
         <h4>Condiciones de Pago</h4>
         ${getDocType() === 'factura' ? '<p><strong>' + document.getElementById('f_payCondition').value + '</strong></p>' : ''}
-        <p>${(payTerms||'').replace(/\n/g,'<br>')}</p>
+        <p>${payTerms||''}</p>
       </div>
       <div class="pdf-terms" style="border:none;padding-top:12px">
         <h4>Observaciones</h4>
-        <p>${(observations||'').replace(/\n/g,'<br>')}</p>
+        <p>${observations||''}</p>
       </div>
       <div class="pdf-sig">
         <div class="pdf-sig-block">
@@ -309,7 +309,7 @@ async function downloadPDF() {
     // Create off-screen render container for clean capture
     const offscreen = document.createElement('div');
     offscreen.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;width:680px;';
-    offscreen.innerHTML = '<div id="pdfRenderOff" style="background:#fff;color:#1a1a2e;max-width:680px;border-radius:6px;overflow:hidden;font-family:DM Sans,sans-serif;">' + buildPdfHtml() + '</div>';
+    offscreen.innerHTML = '<div id="pdfRenderOff" style="background:#fff;color:#1a1a2e;width:680px;border-radius:6px;overflow:hidden;font-family:DM Sans,sans-serif;word-wrap:break-word;overflow-wrap:break-word;">' + buildPdfHtml() + '</div>';
     document.body.appendChild(offscreen);
     const el = document.getElementById('pdfRenderOff');
 
@@ -626,6 +626,7 @@ function renderHistorial() {
         <button class="hist-btn-delete" onclick="deleteDoc('${q.id}')">Eliminar</button>`;
     } else {
       buttons = `
+        <button class="hist-btn-view" onclick="viewCotizacion('${q.id}')">Ver</button>
         <button class="hist-btn-edit" onclick="editCotizacion('${q.id}')">Editar</button>
         <button class="hist-btn-convert" onclick="convertToFactura('${q.id}')">Convertir en Factura</button>`;
     }
@@ -647,6 +648,15 @@ function renderHistorial() {
       </div>
     `;
   }).join('');
+}
+
+// ── VIEW COTIZACIÓN (preview overlay) ──
+function viewCotizacion(id) {
+  const docs = loadDocs();
+  const doc = docs.find(d => d.id === id);
+  if(!doc || !doc.data) { toast('No encontrado'); return; }
+  loadFormData(doc.data);
+  showPreview();
 }
 
 // ── EDIT COTIZACIÓN (loads into form tabs) ──
